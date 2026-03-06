@@ -42,7 +42,7 @@ npm install @organic-programming/holons
 |--------|---------|
 | `transport` | URI parser + listener factory |
 | `serve` | Standard `serve --listen <URI>` runner |
-| `identity` | `HOLON.md` frontmatter parser |
+| `identity` | `holon.yaml` parser |
 | `grpcclient` | Transport-aware client dial helpers |
 | `holonrpc` | Holon-RPC (JSON-RPC 2.0 over WebSocket) client + server |
 
@@ -122,7 +122,7 @@ const { client, close } = await grpcclient.dialURI('ws://127.0.0.1:8080/grpc', H
 ```js
 const { identity } = require('@organic-programming/holons');
 
-const id = identity.parseHolon('HOLON.md');
+const id = identity.parseHolon('holon.yaml');
 console.log(id.uuid, id.given_name, id.lang);
 ```
 
