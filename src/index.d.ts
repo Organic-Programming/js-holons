@@ -152,6 +152,42 @@ export namespace identity {
     function parseHolon(filePath: string): HolonIdentity;
 }
 
+// --- Discover ---
+
+export namespace discover {
+    interface HolonBuild {
+        runner: string;
+        main: string;
+    }
+
+    interface HolonArtifacts {
+        binary: string;
+        primary: string;
+    }
+
+    interface HolonManifest {
+        kind: string;
+        build: HolonBuild;
+        artifacts: HolonArtifacts;
+    }
+
+    interface HolonEntry {
+        slug: string;
+        uuid: string;
+        dir: string;
+        relative_path: string;
+        origin: string;
+        identity: identity.HolonIdentity;
+        manifest: HolonManifest | null;
+    }
+
+    function discover(root: string): Promise<HolonEntry[]>;
+    function discoverLocal(): Promise<HolonEntry[]>;
+    function discoverAll(): Promise<HolonEntry[]>;
+    function findBySlug(slug: string): Promise<HolonEntry | null>;
+    function findByUUID(prefix: string): Promise<HolonEntry | null>;
+}
+
 // --- gRPC Client ---
 
 export namespace grpcclient {
