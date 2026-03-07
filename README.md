@@ -1,8 +1,8 @@
 # js-holons
 
 **Node.js SDK for Organic Programming** — transport, serve, identity,
-gRPC client helpers, and Holon-RPC server utilities for building holons
-in JavaScript/TypeScript.
+discovery, connect helpers, gRPC client helpers, and Holon-RPC
+client/server utilities for building holons in JavaScript/TypeScript.
 
 This SDK now mirrors the Go reference capability set at the URI level:
 
@@ -26,6 +26,8 @@ npm install @organic-programming/holons
 | `transport` | URI parser + listener factory |
 | `serve` | Standard `serve --listen <URI>` runner |
 | `identity` | `holon.yaml` parser |
+| `discover` | Filesystem discovery for local, `$OPBIN`, and cache roots |
+| `connect` | Slug/direct-target resolution to ready gRPC clients |
 | `grpcclient` | Transport-aware client dial helpers |
 | `holonrpc` | Holon-RPC (JSON-RPC 2.0 over WebSocket) client + server |
 
@@ -109,6 +111,24 @@ const id = identity.parseHolon('holon.yaml');
 console.log(id.uuid, id.given_name, id.lang);
 ```
 
+## Discovery and Connect
+
+```js
+const { discover, connect } = require('@organic-programming/holons');
+
+const entry = await discover.findBySlug('atlas-daemon');
+const client = await connect.connect('atlas-daemon');
+try {
+  console.log(entry?.dir);
+} finally {
+  await connect.disconnect(client);
+}
+```
+
+`connect.connect()` resolves either a slug or a direct address. It can
+reuse an advertised daemon, start one on ephemeral TCP, or launch an
+ephemeral `stdio://` session depending on the options you pass.
+
 ## WSS TLS Configuration
 
 For `wss://` listeners, provide TLS key/cert either:
@@ -145,6 +165,19 @@ For `wss://` listeners, provide TLS key/cert either:
 ### `identity`
 
 - `parseHolon(filePath)`
+
+### `discover`
+
+- `discover(root)`
+- `discoverLocal()`
+- `discoverAll()`
+- `findBySlug(slug)`
+- `findByUUID(prefix)`
+
+### `connect`
+
+- `connect(target, opts?)`
+- `disconnect(client)`
 
 ### `holonrpc`
 
