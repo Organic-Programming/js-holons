@@ -188,6 +188,20 @@ export namespace discover {
     function findByUUID(prefix: string): Promise<HolonEntry | null>;
 }
 
+// --- Connect ---
+
+export namespace connect {
+    interface ConnectOptions {
+        timeout?: number;
+        transport?: 'tcp' | 'stdio';
+        start?: boolean;
+        port_file?: string;
+    }
+
+    function connect(target: string, opts?: ConnectOptions): Promise<grpc.Client>;
+    function disconnect(client: grpc.Client): Promise<void>;
+}
+
 // --- gRPC Client ---
 
 export namespace grpcclient {
