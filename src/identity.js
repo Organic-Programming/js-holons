@@ -1,4 +1,4 @@
-// Parse HOLON.md identity files.
+// Parse holon.yaml identity files.
 
 'use strict';
 
@@ -24,24 +24,16 @@ const YAML = require('yaml');
  */
 
 /**
- * Parse a HOLON.md file.
+ * Parse a holon.yaml file.
  * @param {string} filePath
  * @returns {HolonIdentity}
  */
 function parseHolon(filePath) {
     const text = fs.readFileSync(filePath, 'utf-8');
-
-    if (!text.startsWith('---')) {
-        throw new Error(`${filePath}: missing YAML frontmatter`);
+    const data = YAML.parse(text);
+    if (data === null || Array.isArray(data) || typeof data !== 'object') {
+        throw new Error(`${filePath}: holon.yaml must be a YAML mapping`);
     }
-
-    const endIdx = text.indexOf('---', 3);
-    if (endIdx < 0) {
-        throw new Error(`${filePath}: unterminated YAML frontmatter`);
-    }
-
-    const frontmatter = text.slice(3, endIdx).trim();
-    const data = YAML.parse(frontmatter) || {};
 
     return {
         uuid: data.uuid || '',

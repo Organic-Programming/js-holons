@@ -427,18 +427,15 @@ describe('transport', () => {
 // --- Identity tests ---
 
 describe('identity', () => {
-    it('parseHolon() parses HOLON.md', () => {
-        const tmpFile = path.join(os.tmpdir(), `test_holon_${Date.now()}.md`);
+    it('parseHolon() parses holon.yaml', () => {
+        const tmpFile = path.join(os.tmpdir(), `test_holon_${Date.now()}.yaml`);
         fs.writeFileSync(tmpFile,
-            '---\n' +
             'uuid: "abc-123"\n' +
             'given_name: "test-holon"\n' +
             'family_name: "Test"\n' +
             'motto: "A test holon."\n' +
             'clade: "deterministic/pure"\n' +
-            'lang: "javascript"\n' +
-            '---\n' +
-            '# test-holon\n'
+            'lang: "javascript"\n'
         );
 
         const id = identity.parseHolon(tmpFile);
@@ -449,10 +446,10 @@ describe('identity', () => {
         fs.unlinkSync(tmpFile);
     });
 
-    it('parseHolon() throws for missing frontmatter', () => {
-        const tmpFile = path.join(os.tmpdir(), `no_fm_${Date.now()}.md`);
-        fs.writeFileSync(tmpFile, '# No frontmatter\n');
-        assert.throws(() => identity.parseHolon(tmpFile), /frontmatter/);
+    it('parseHolon() throws for invalid mapping', () => {
+        const tmpFile = path.join(os.tmpdir(), `invalid_holon_${Date.now()}.yaml`);
+        fs.writeFileSync(tmpFile, '- not\n- a\n- mapping\n');
+        assert.throws(() => identity.parseHolon(tmpFile), /mapping/);
         fs.unlinkSync(tmpFile);
     });
 });
@@ -641,25 +638,9 @@ describe('grpcclient', () => {
     });
 });
 
-// --- Certification command tests ---
+// --- Wrapper command tests ---
 
-describe('certification commands', () => {
-    it('cert.json declares runnable echo executables', () => {
-        const cert = require('../cert.json');
-        assert.equal(cert.executables.echo_server, 'node ./cmd/echo-server.js');
-        assert.equal(cert.executables.echo_client, 'node ./cmd/echo-client.js');
-    });
-
-    it('cert.json declares runnable holon-rpc client executable and capability', () => {
-        const cert = require('../cert.json');
-        const executable = cert.executables.holon_rpc_client;
-        assert.equal(executable, 'node ./cmd/holon-rpc-client.js');
-        assert.equal(cert.capabilities.holon_rpc_client, true);
-
-        const scriptPath = executable.replace(/^node\s+\.\//, '');
-        const absolutePath = path.resolve(__dirname, '..', scriptPath);
-        assert.equal(fs.existsSync(absolutePath), true);
-    });
+describe('wrapper commands', () => {
 
     it('holon-rpc-client parseArgs supports method, timeout, and expected errors', () => {
         const rpcClient = require('../cmd/holon-rpc-client');
