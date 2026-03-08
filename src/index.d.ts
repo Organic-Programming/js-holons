@@ -129,6 +129,22 @@ export namespace serve {
     const DEFAULT_URI: string;
 }
 
+export namespace describe {
+    const HOLON_META_SERVICE_NAME: string;
+    const holonmeta: {
+        HOLON_META_SERVICE_DEF: grpc.ServiceDefinition;
+        FieldLabel: Record<string, number>;
+    };
+
+    function buildResponse(protoDir: string, holonYamlPath: string): {
+        slug: string;
+        motto: string;
+        services: Array<Record<string, any>>;
+    };
+
+    function register(server: grpc.Server, protoDir: string, holonYamlPath: string): void;
+}
+
 // --- Identity ---
 
 export namespace identity {

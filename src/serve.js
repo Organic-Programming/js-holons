@@ -6,6 +6,7 @@ const net = require('node:net');
 const fs = require('node:fs');
 const grpc = require('@grpc/grpc-js');
 
+const describe = require('./describe');
 const transport = require('./transport');
 const {
     registerMemEndpoint,
@@ -39,6 +40,7 @@ async function runWithOptions(listenUri, registerFn, reflectOrOptions = true) {
         'grpc.max_connection_idle_ms': MAX_GRPC_CONNECTION_IDLE_MS,
     });
     registerFn(server);
+    autoRegisterHolonMeta(server);
 
     const reflectionEnabled = maybeEnableReflection(server, options);
 
@@ -64,6 +66,18 @@ async function runWithOptions(listenUri, registerFn, reflectOrOptions = true) {
     (options.logger || console).error(`gRPC server listening on ${runtime.publicURI} (${mode})`);
 
     return server;
+}
+
+function autoRegisterHolonMeta(server) {
+    const holonYamlPath = pathJoin(process.cwd(), 'holon.yaml');
+    if (!fs.existsSync(holonYamlPath)) {
+        return;
+    }
+    describe.register(server, pathJoin(process.cwd(), 'protos'), holonYamlPath);
+}
+
+function pathJoin(...parts) {
+    return require('node:path').join(...parts);
 }
 
 function normalizeRunOptions(input) {

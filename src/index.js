@@ -4,6 +4,7 @@
 
 const transport = require('./transport');
 const serve = require('./serve');
+const describe = require('./describe');
 const identity = require('./identity');
 const discover = require('./discover');
 const connect = require('./connect');
@@ -16,4 +17,4 @@ const holonrpc = {
     ...holonrpcClient,
 };
 
-module.exports = { transport, serve, identity, discover, connect, grpcclient, holonrpc };
+module.exports = { transport, serve, describe, identity, discover, connect, grpcclient, holonrpc };
