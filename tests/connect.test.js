@@ -35,9 +35,11 @@ describe('connect', { concurrency: 1 }, () => {
 
         const client = await connectModule.connect(fixture.slug);
         const pid = await waitForPidFile(fixture.pidFile);
+        const args = await waitForArgLines(fixture.argsFile);
 
         const out = await invokePing(client, 'ephemeral-js');
         assert.equal(out.message, 'ephemeral-js');
+        assert.deepEqual(args, ['serve', '--listen', 'stdio://']);
 
         await connectModule.disconnect(client);
         await waitForPidExit(pid);
@@ -49,7 +51,7 @@ describe('connect', { concurrency: 1 }, () => {
         const fixture = await createHolonFixture(t, 'Connect', 'Persistent');
         useHolonRoot(t, fixture.root);
 
-        const client = await connectModule.connect(fixture.slug, { timeout: 5000, start: true });
+        const client = await connectModule.connect(fixture.slug, { timeout: 5000, start: true, transport: 'tcp' });
         const pid = await waitForPidFile(fixture.pidFile);
 
         const portTarget = (await fs.promises.readFile(fixture.portFile, 'utf8')).trim();
@@ -146,10 +148,11 @@ async function createHolonFixture(t, givenName, familyName) {
     const binaryDir = path.join(holonDir, '.op', 'build', 'bin');
     const binaryPath = path.join(binaryDir, 'echo-wrapper');
     const pidFile = path.join(root, `${slug}.pid`);
+    const argsFile = path.join(root, `${slug}.args`);
     const portFile = path.join(root, '.op', 'run', `${slug}.port`);
 
     await fs.promises.mkdir(binaryDir, { recursive: true });
-    await fs.promises.writeFile(binaryPath, wrapperScript(pidFile), { mode: 0o755 });
+    await fs.promises.writeFile(binaryPath, wrapperScript(pidFile, argsFile), { mode: 0o755 });
     await fs.promises.writeFile(path.join(holonDir, 'holon.yaml'), [
         `uuid: "${slug}-uuid"`,
         `given_name: "${givenName}"`,
@@ -168,13 +171,15 @@ async function createHolonFixture(t, givenName, familyName) {
         await fs.promises.rm(root, { recursive: true, force: true });
     });
 
-    return { root, slug, binaryPath, pidFile, portFile };
+    return { root, slug, binaryPath, pidFile, argsFile, portFile };
 }
 
-function wrapperScript(pidFile) {
+function wrapperScript(pidFile, argsFile) {
     return [
         '#!/bin/sh',
         `printf '%s\n' "$$" > ${shellQuote(pidFile)}`,
+        `: > ${shellQuote(argsFile)}`,
+        `for arg in "$@"; do printf '%s\n' "$arg" >> ${shellQuote(argsFile)}; done`,
         `exec ${shellQuote(process.execPath)} ${shellQuote(ECHO_SERVER)} "$@"`,
         '',
     ].join('\n');
@@ -256,6 +261,26 @@ function waitForAdvertisedURI(child, timeoutMs = 5000) {
             child.removeAllListeners('exit');
         }
     });
+}
+
+async function waitForArgLines(argsFile, timeoutMs = 5000) {
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+        try {
+            const lines = (await fs.promises.readFile(argsFile, 'utf8'))
+                .split(/\r?\n/)
+                .filter(Boolean);
+            if (lines.length > 0) {
+                return lines;
+            }
+        } catch {
+            // Ignore transient file creation/read races while the wrapper starts.
+        }
+        await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+
+    throw new Error(`timed out waiting for wrapper args in ${argsFile}`);
 }
 
 function firstURI(line) {

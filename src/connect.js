@@ -32,8 +32,17 @@ async function connect(target, opts) {
         throw new Error(`holon "${trimmed}" not found`);
     }
 
+    const portFile = options.port_file || defaultPortFilePath(entry.slug);
+    const reusable = await usablePortFile(portFile, options.timeout);
+    if (reusable) {
+        return reusable;
+    }
+    if (!options.start) {
+        throw new Error(`holon "${trimmed}" is not running`);
+    }
+
+    const binaryPath = await resolveBinaryPath(entry);
     if (options.transport === 'stdio') {
-        const binaryPath = await resolveBinaryPath(entry);
         const session = await grpcclient.dialStdio(binaryPath, grpc.Client, {
             credentials: grpc.credentials.createInsecure(),
         });
@@ -46,16 +55,6 @@ async function connect(target, opts) {
         return session.client;
     }
 
-    const portFile = options.port_file || defaultPortFilePath(entry.slug);
-    const reusable = await usablePortFile(portFile, options.timeout);
-    if (reusable) {
-        return reusable;
-    }
-    if (!options.start) {
-        throw new Error(`holon "${trimmed}" is not running`);
-    }
-
-    const binaryPath = await resolveBinaryPath(entry);
     const { client, child, target: advertisedTarget } = await startTCPHolon(binaryPath, options.timeout);
 
     if (!ephemeral) {
@@ -98,7 +97,7 @@ async function disconnect(client) {
 
 function normalizeOptions(opts = {}) {
     const timeout = Number.isFinite(opts.timeout) && opts.timeout > 0 ? opts.timeout : DEFAULT_TIMEOUT_MS;
-    const transportName = String(opts.transport || 'tcp').trim().toLowerCase();
+    const transportName = String(opts.transport || 'stdio').trim().toLowerCase();
     if (transportName !== 'tcp' && transportName !== 'stdio') {
         throw new Error(`unsupported transport ${JSON.stringify(opts.transport)}`);
     }
