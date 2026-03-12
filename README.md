@@ -116,8 +116,8 @@ console.log(id.uuid, id.given_name, id.lang);
 ```js
 const { discover, connect } = require('@organic-programming/holons');
 
-const entry = await discover.findBySlug('atlas-daemon');
-const client = await connect.connect('atlas-daemon');
+const entry = await discover.findBySlug('rob-go');
+const client = await connect.connect('rob-go');
 try {
   console.log(entry?.dir);
 } finally {
