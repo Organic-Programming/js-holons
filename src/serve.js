@@ -16,7 +16,6 @@ const {
 
 const DEFAULT_URI = transport.DEFAULT_URI;
 const MAX_GRPC_MESSAGE_BYTES = 1 * 1024 * 1024;
-const MAX_GRPC_CONNECTION_IDLE_MS = 250;
 
 function parseFlags(args) {
     for (let i = 0; i < args.length; i += 1) {
@@ -37,7 +36,6 @@ async function runWithOptions(listenUri, registerFn, reflectOrOptions = true) {
     const server = new grpc.Server({
         'grpc.max_receive_message_length': MAX_GRPC_MESSAGE_BYTES,
         'grpc.max_send_message_length': MAX_GRPC_MESSAGE_BYTES,
-        'grpc.max_connection_idle_ms': MAX_GRPC_CONNECTION_IDLE_MS,
     });
     registerFn(server);
     autoRegisterHolonMeta(server);

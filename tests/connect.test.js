@@ -47,6 +47,22 @@ describe('connect', { concurrency: 1 }, () => {
         await assert.rejects(fs.promises.stat(fixture.portFile), /ENOENT/);
     });
 
+    it('keeps stdio connections alive long enough for the first delayed RPC', async (t) => {
+        const fixture = await createHolonFixture(t, 'Connect', 'Delayed');
+        useHolonRoot(t, fixture.root);
+
+        const client = await connectModule.connect(fixture.slug);
+        const pid = await waitForPidFile(fixture.pidFile);
+
+        await sleep(600);
+
+        const out = await invokePing(client, 'delayed-js');
+        assert.equal(out.message, 'delayed-js');
+
+        await connectModule.disconnect(client);
+        await waitForPidExit(pid);
+    });
+
     it('writes a port file in persistent mode and reuses it', async (t) => {
         const fixture = await createHolonFixture(t, 'Connect', 'Persistent');
         useHolonRoot(t, fixture.root);
