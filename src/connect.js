@@ -15,13 +15,14 @@ const DEFAULT_TIMEOUT_MS = 5000;
 const started = new WeakMap();
 
 async function connect(target, opts) {
-    const options = normalizeOptions(opts);
-    const ephemeral = opts == null || options.transport === 'stdio';
     const trimmed = String(target || '').trim();
 
     if (!trimmed) {
         throw new Error('target is required');
     }
+
+    const options = normalizeOptions(opts);
+    const ephemeral = opts == null || options.transport === 'stdio';
 
     if (isDirectTarget(trimmed)) {
         return dialReady(normalizeDialTarget(trimmed), options.timeout);
@@ -55,7 +56,10 @@ async function connect(target, opts) {
         return session.client;
     }
 
-    const { client, child, target: advertisedTarget } = await startTCPHolon(binaryPath, options.timeout);
+    const startup = options.transport === 'unix'
+        ? await startUnixHolon(binaryPath, entry.slug, portFile, options.timeout)
+        : await startTCPHolon(binaryPath, options.timeout);
+    const { client, child, target: advertisedTarget } = startup;
 
     if (!ephemeral) {
         try {
@@ -98,7 +102,7 @@ async function disconnect(client) {
 function normalizeOptions(opts = {}) {
     const timeout = Number.isFinite(opts.timeout) && opts.timeout > 0 ? opts.timeout : DEFAULT_TIMEOUT_MS;
     const transportName = String(opts.transport || 'stdio').trim().toLowerCase();
-    if (transportName !== 'tcp' && transportName !== 'stdio') {
+    if (transportName !== 'tcp' && transportName !== 'stdio' && transportName !== 'unix') {
         throw new Error(`unsupported transport ${JSON.stringify(opts.transport)}`);
     }
 
@@ -173,6 +177,53 @@ async function startTCPHolon(binaryPath, timeoutMs) {
         await stopChild(child);
         throw err;
     }
+}
+
+async function startUnixHolon(binaryPath, slug, portFile, timeoutMs) {
+    const target = defaultUnixSocketURI(slug, portFile);
+    const socketPath = target.slice('unix://'.length);
+    const child = spawn(binaryPath, ['serve', '--listen', target], {
+        stdio: ['ignore', 'ignore', 'pipe'],
+    });
+
+    try {
+        await waitForUnixSocket(child, socketPath, timeoutMs);
+        const client = await dialReady(normalizeDialTarget(target), timeoutMs);
+        return { client, child, target };
+    } catch (err) {
+        await stopChild(child);
+        throw err;
+    }
+}
+
+async function waitForUnixSocket(child, socketPath, timeoutMs) {
+    const deadline = Date.now() + timeoutMs;
+    const stderrChunks = [];
+
+    child.stderr.on('data', (chunk) => {
+        stderrChunks.push(Buffer.from(chunk));
+    });
+
+    while (Date.now() < deadline) {
+        if (child.exitCode !== null) {
+            const stderrText = Buffer.concat(stderrChunks).toString('utf8').trim();
+            const details = stderrText ? `: ${stderrText}` : '';
+            throw new Error(`holon exited before binding unix socket (${child.exitCode})${details}`);
+        }
+
+        try {
+            const stat = await fs.promises.stat(socketPath);
+            if (stat.isSocket?.() ?? true) {
+                return;
+            }
+        } catch {}
+
+        await sleep(20);
+    }
+
+    const stderrText = Buffer.concat(stderrChunks).toString('utf8').trim();
+    const details = stderrText ? `: ${stderrText}` : '';
+    throw new Error(`timed out waiting for unix holon startup${details}`);
 }
 
 function waitForAdvertisedURI(child, timeoutMs) {
@@ -254,6 +305,44 @@ async function resolveBinaryPath(entry) {
 
 function defaultPortFilePath(slug) {
     return path.join(process.cwd(), '.op', 'run', `${slug}.port`);
+}
+
+function defaultUnixSocketURI(slug, portFile) {
+    const label = socketLabel(slug);
+    const hash = fnv1a64(String(portFile));
+    return `unix:///tmp/holons-${label}-${hash.toString(16).padStart(12, '0').slice(-12)}.sock`;
+}
+
+function socketLabel(slug) {
+    let label = '';
+    let lastDash = false;
+
+    for (const ch of String(slug || '').trim().toLowerCase()) {
+        const code = ch.charCodeAt(0);
+        if ((code >= 97 && code <= 122) || (code >= 48 && code <= 57)) {
+            label += ch;
+            lastDash = false;
+        } else if ((ch === '-' || ch === '_') && label && !lastDash) {
+            label += '-';
+            lastDash = true;
+        }
+
+        if (label.length >= 24) {
+            break;
+        }
+    }
+
+    label = label.replace(/^-+|-+$/g, '');
+    return label || 'socket';
+}
+
+function fnv1a64(text) {
+    let hash = 0xcbf29ce484222325n;
+    for (const byte of Buffer.from(String(text), 'utf8')) {
+        hash ^= BigInt(byte);
+        hash = (hash * 0x100000001b3n) & 0xffffffffffffffffn;
+    }
+    return hash & 0xffffffffffffn;
 }
 
 async function writePortFile(portFile, uri) {

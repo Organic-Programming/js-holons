@@ -87,6 +87,30 @@ describe('connect', { concurrency: 1 }, () => {
         await waitForPidExit(pid);
     });
 
+    it('writes a unix port file in persistent mode and reuses it', async (t) => {
+        const fixture = await createHolonFixture(t, 'Connect', 'Unix');
+        useHolonRoot(t, fixture.root);
+
+        const client = await connectModule.connect(fixture.slug, { timeout: 5000, start: true, transport: 'unix' });
+        const pid = await waitForPidFile(fixture.pidFile);
+
+        const portTarget = (await fs.promises.readFile(fixture.portFile, 'utf8')).trim();
+        assert.match(portTarget, /^unix:\/\/\/tmp\/holons-/);
+
+        await connectModule.disconnect(client);
+        assert.equal(pidExists(pid), true);
+
+        const reused = await connectModule.connect(fixture.slug);
+        t.after(async () => connectModule.disconnect(reused));
+        assert.equal(connectModule._internal.started.has(reused), false);
+
+        const out = await invokePing(reused, 'unix-js');
+        assert.equal(out.message, 'unix-js');
+
+        await terminatePid(pid);
+        await waitForPidExit(pid);
+    });
+
     it('reuses an existing port file without starting a new process', async (t) => {
         const fixture = await createHolonFixture(t, 'Connect', 'Reuse');
         useHolonRoot(t, fixture.root);
